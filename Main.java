@@ -1,7 +1,8 @@
 import functions.*;
 import functions.basic.*;
 import functions.threads.Generator;
-import functions.threads.Semaphore;
+import java.util.concurrent.Semaphore;
+
 import functions.threads.Integrator;
 import functions.threads.SimpleGenerator;
 import functions.threads.SimpleIntegrator;
@@ -21,7 +22,7 @@ public class Main
         double left = 0;
         double right = 1;
         double equivalentValue = Math.E - 1;
-        double step = 0.00001;
+        double step = 0.0001;
        
         double integral = Functions.integrate(expFunction, left, right, step);
         
@@ -52,11 +53,12 @@ public class Main
     {
     
     Task task = new Task(100);
-    Semaphore semaphore = new Semaphore();
+    Semaphore dataReady = new Semaphore(0);
+    Semaphore dataProcessed = new Semaphore(1);
     
     
-    Generator generator = new Generator(task, semaphore);
-    Integrator integrator = new Integrator(task, semaphore);
+    Generator generator = new Generator(task, dataReady,dataProcessed);
+    Integrator integrator = new Integrator(task,dataReady,dataProcessed);
     
     System.out.println("complicatedThreads");
     System.out.println("Всего задач: " + task.getTaskCount());
@@ -97,7 +99,7 @@ public class Main
         Thread integratorThread = new Thread(new SimpleIntegrator(task));
         // Эксперименты с приоритетами
         //одинаковые приоритеты
-        generatorThread.setPriority(Thread.MIN_PRIORITY);
+        generatorThread.setPriority(Thread.NORM_PRIORITY);
         integratorThread.setPriority(Thread.MAX_PRIORITY);
         //разные приоритеты_1
         // generatorThread.setPriority(Thread.MAX_PRIORITY);

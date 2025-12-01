@@ -9,6 +9,7 @@ public class Task
     private double rightBorder;
     private double step;
     private int taskCount;
+    
 
     public Task()
     {

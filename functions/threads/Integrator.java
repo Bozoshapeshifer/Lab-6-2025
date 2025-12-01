@@ -2,16 +2,19 @@ package functions.threads;
 
 import functions.Function;
 import functions.Functions;
+import java.util.concurrent.Semaphore;
 
 public class Integrator extends Thread 
 {
     private Task task;
-    private Semaphore semaphore;
+    private Semaphore dataReady;
+    private Semaphore dataProcessed;
     
-    public Integrator(Task task, Semaphore semaphore) 
+    public Integrator(Task task,Semaphore dataReady,Semaphore dataProcessed) 
     {
         this.task = task;
-        this.semaphore = semaphore;
+        this.dataReady = dataReady;
+        this.dataProcessed=dataProcessed;
         this.setName("Integrator-Thread");
     }
     
@@ -23,44 +26,28 @@ public void run() {
     System.out.println(getName() + " started");
     
     try {
-        while (tasksProcessed < taskCount && !isInterrupted()) {
-            Function function = null;
-            double leftBorder = 0, rightBorder = 0, step = 0;
-            
+        while (tasksProcessed < taskCount && !isInterrupted()) 
+            {
             try {
-                // Используем семафор для получения доступа на ЧТЕНИЕ
-                semaphore.beginRead();
-                
-                try {
-                    // Читаем все параметры задачи
-                    function = task.getFunction();
-                    if (function != null) {
-                        leftBorder = task.getLeftBorder();
-                        rightBorder = task.getRightBorder();
-                        step = task.getStep();
+                // Используем семафор для чтения     
+                 dataReady.acquire();
+                 if (isInterrupted()) {
+                        // Освобождаем семафор для завершения другого потока
+                        dataProcessed.release();
+                        break;
                     }
-                } finally {
-                    // Всегда освобождаем семафор
-                    semaphore.endRead();
-                }
+                    Function function = task.getFunction();
+                    double leftBorder = task.getLeftBorder();
+                    double rightBorder = task.getRightBorder();
+                    double step = task.getStep();
+
                 
-                // Если функция не установлена, ждем
-                if (function == null) {
-                    try {
-                        Thread.sleep(5);
-                    } catch (InterruptedException e) {
-                        System.out.println(getName() + " interrupted while waiting for data");
-                        break; // Выходим из цикла
-                    }
-                    continue;
-                }
-                
-                try {
-                    // Вычисляем интеграл
-                    double integral = Functions.integrate(function, leftBorder, rightBorder, step);
+                try 
+                {
+                    double integral= Functions.integrate(function, leftBorder, rightBorder, step);
                     
-                    System.out.printf("%s: Task %d - [%.4f, %.4f], step: %.6f, result: %.6f%n",
-                        getName(), tasksProcessed + 1, leftBorder, rightBorder, step, integral);
+                    
+                    System.out.printf("%s: Task %d - [%.4f, %.4f], step: %.6f, result: %.6f%n",getName(), tasksProcessed + 1, leftBorder, rightBorder, step, integral);
                     
                     tasksProcessed++;
                     
@@ -69,12 +56,14 @@ public void run() {
                         getName(), tasksProcessed + 1, e.getMessage());
                     tasksProcessed++;
                 }
-                
+
+                dataProcessed.release();
                 // Пауза между задачами
                 try {
                     Thread.sleep(10);
                 } catch (InterruptedException e) {
                     System.out.println(getName() + " interrupted between tasks");
+                    Thread.currentThread().interrupt();
                     break; // Выходим из цикла
                 }
                 

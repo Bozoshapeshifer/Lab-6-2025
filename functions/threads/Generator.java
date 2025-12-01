@@ -2,14 +2,18 @@ package functions.threads;
 
 import functions.basic.*;
 import java.util.Random;
+import java.util.concurrent.Semaphore;
 
 public class Generator extends Thread {
     private Task task;
-    private Semaphore semaphore;
+     Semaphore dataReady;
+     Semaphore dataProcessed;
     
-    public Generator(Task task, Semaphore semaphore) {
+    public Generator(Task task, Semaphore dataReady, Semaphore dataProcessed) 
+    {
         this.task = task;
-        this.semaphore = semaphore;
+        this.dataReady = dataReady;
+        this.dataProcessed = dataProcessed;
         this.setName("Generator-Thread");
     }
 
@@ -23,6 +27,14 @@ public void run() {
     try {
         for (int i = 0; i < taskCount && !isInterrupted(); i++) {
             try {
+                dataProcessed.acquire();
+                
+                if (isInterrupted())
+                    {
+                        // Освобождаем семафор для завершения другого потока
+                        dataReady.release();
+                        break;
+                    }
                 // Генерируем параметры
                 double base;
                 do {
@@ -48,7 +60,7 @@ public void run() {
                 }
 
                 // Используем семафор для записи
-                semaphore.beginWrite();
+                
                 
                 try {
                     task.setFunction(logFunc);
@@ -60,14 +72,15 @@ public void run() {
                                      getName(), i + 1,
                                      leftBorder, rightBorder, step, base);
                 } finally {
-                    semaphore.endWrite();
-                }
+
+                    dataReady.release();                }
 
                 // Пауза
                 try {
                     Thread.sleep(10);
                 } catch (InterruptedException e) {
                     System.out.println(getName() + " interrupted during sleep");
+                    Thread.currentThread().interrupt();
                     break; // Выходим из цикла
                 }
 
@@ -76,6 +89,7 @@ public void run() {
                 break; // Выходим из цикла
             } catch (Exception e) {
                 System.out.println(getName() + " error: " + e.getMessage());
+                dataProcessed.release();
                 i--; // Повторяем итерацию
             }
         }
